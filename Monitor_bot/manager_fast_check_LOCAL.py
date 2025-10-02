@@ -146,7 +146,7 @@ def save_product_to_db(user_id: str, product_url: str, product_name: str, price_
         """, (product_name, price_card, price_no_card, html_file, now, user_id, product_url))
 
         # Обновляем day_price если новый день
-        if not day_start_time or datetime.fromisoformat(day_start_time).date() < today:
+        if not day_start_time or datetime.strptime(day_start_time, "%Y-%m-%d %H:%M:%S").date() < today:
             cursor.execute("""
                 UPDATE products
                 SET day_start_time=?, day_price_card=?, day_price_no_card=?

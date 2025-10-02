@@ -1,4 +1,4 @@
-# manager_parsing_fast.py
+# manager_parsing_fast_v4.py
 import os
 import json
 import sqlite3
@@ -11,7 +11,7 @@ from datetime import datetime, date, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+import chromedriver_autoinstaller
 from bs4 import BeautifulSoup
 
 DB_FILE = "db.sqlite"
@@ -35,10 +35,13 @@ def create_browser(cookies_file: str = None, headless=True):
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
     )
-    # <-- добавляем путь к бинарнику Chromium
-    # chrome_options.binary_location = "/usr/bin/chromium-browser"
+    # путь к бинарнику Chromium
+    chrome_options.binary_location = "/usr/bin/chromium-browser"
 
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    # автоустановка подходящего ChromeDriver
+    chromedriver_autoinstaller.install()
+
+    driver = webdriver.Chrome(options=chrome_options)
 
     if cookies_file and os.path.exists(cookies_file):
         driver.get("https://www.ozon.ru/")
@@ -136,24 +139,20 @@ def save_product_to_db(user_id: str, product_url: str, product_name: str, price_
     week_start = today - timedelta(days=today.weekday())
 
     if row:
-        # повторная проверка
         last_check_time, last_price_card, last_price_no_card, day_start_time, week_start_time = row
-        # обновляем last_price
         cursor.execute("""
             UPDATE products
             SET product_name=?, last_price_card=?, last_price_no_card=?, html_file=?, last_check_time=?
             WHERE user_id=? AND product_url=?
         """, (product_name, price_card, price_no_card, html_file, now, user_id, product_url))
 
-        # Обновляем day_price если новый день
-        if not day_start_time or datetime.fromisoformat(day_start_time).date() < today:
+        if not day_start_time or datetime.strptime(day_start_time, "%Y-%m-%d %H:%M:%S").date() < today:
             cursor.execute("""
                 UPDATE products
                 SET day_start_time=?, day_price_card=?, day_price_no_card=?
                 WHERE user_id=? AND product_url=?
             """, (now, price_card, price_no_card, user_id, product_url))
 
-        # Обновляем week_price если новая неделя
         if not week_start_time or datetime.strptime(week_start_time, "%Y-%m-%d %H:%M:%S").date() < week_start:
             cursor.execute("""
                 UPDATE products
@@ -162,7 +161,6 @@ def save_product_to_db(user_id: str, product_url: str, product_name: str, price_
             """, (now, price_card, price_no_card, user_id, product_url))
 
     else:
-        # первая проверка
         cursor.execute("""
             INSERT INTO products (
                 user_id, product_url, product_name, last_check_time,
